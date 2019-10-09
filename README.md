@@ -1,2 +1,2 @@
-# Image-Classification-Google__Divergence Academy_101
+# Image-Classification-Google_Python Notebooks
 Pixel prediction
