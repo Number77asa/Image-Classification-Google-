@@ -1,0 +1,308 @@
+
+def fit_linear_reg(X,y_final):
+        X=X_final.iloc[:,0:10]
+        Y=y_final
+        import itertools
+        import time
+        import numpy as np
+        import pandas as pd
+        import seaborn as sns
+        import statsmodels.api as sm
+        import matplotlib.pyplot as plt
+        from sklearn import linear_model
+        from sklearn.metrics import mean_squared_error
+        #Fit linear regression model and return RSS and R squared values
+        model_k = linear_model.LinearRegression(fit_intercept = True)
+        model_k.fit(X,Y)
+        RSS = mean_squared_error(Y,model_k.predict(X)) * len(Y)
+        R_squared = model_k.score(X,Y)
+
+
+
+        %matplotlib inline
+        plt.style.use('ggplot')
+
+        k= len(X.columns)
+
+        #cant have more than 21 features ssince .combinations doesnt handle more
+        X=X_final.iloc[:,0:10]
+        Y=y_final
+        #Implementing Best subset selection (using itertools.combinations)
+        #Importing tqdm for the progress bar
+        def fit_linear_reg(X,Y):
+            #Fit linear regression model and return RSS and R squared values
+            model_k = linear_model.LinearRegression(fit_intercept = True)
+            model_k.fit(X,Y)
+            RSS = mean_squared_error(Y,model_k.predict(X)) * len(Y)
+            R_squared = model_k.score(X,Y)
+            return RSS, R_squared
+                    #the fnctn above must end with the line above in orderfor tnrange to work below
+        
+        RSS_list, R_squared_list, feature_list = [],[],[]
+        index2 = []
+        from tqdm import tnrange, tqdm_notebook
+
+        #Initialization variables
+        #k=numberr of cols
+
+        
+
+        #Looping over k = 1 to  features in X
+        for k in tnrange(1,len(X.columns) + 1, desc = 'Loop...'):
+
+            #Looping over all possible combinations: from 11 choose k
+            for combo in itertools.combinations(X.columns,k):
+                tmp_result = fit_linear_reg(X[list(combo)],Y)   #Store temp result 
+                RSS_list.append(tmp_result[0])                  #Append lists
+                R_squared_list.append(tmp_result[1])
+                feature_list.append(combo)
+                index2.append(len(combo))
+            #return RSS, R_squared
+        #Store in DataFrame
+            #In df, we also want to output features as column indices; to extract out mode? is it necesarry since we could just use .loc
+        df = pd.DataFrame({'index2': index2,'RSS': RSS_list, 'R_squared':R_squared_list,'features':feature_list})
+
+        df1 = pd.concat([pd.DataFrame({'features':feature_list}),pd.DataFrame({'RSS':RSS_list, 'R_squared': R_squared_list})], axis=1, join='inner')
+        df1['index2'] = df1.index
+
+        df2=df1
+
+        #add a penalization term to punish larger models for low gain in fit. --> No need to Mallos (Cp) below already does just this
+            #Cp=1m(RSS+2dσ^2) ; the penilzation terms i d(var^2); d is # of dimensions
+
+        #what's the deviance ('model variance') ..is RSS sufficient? 
+
+        df['min_RSS'] = df.groupby('index2')['RSS'].transform(min)
+        df['max_R_squared'] = df.groupby('index2')['R_squared'].transform(max)
+
+
+        fig = plt.figure(figsize = (16,6))
+        ax = fig.add_subplot(1, 2, 1)
+
+        ax.scatter(df.index2,df.RSS, alpha = .2, color = 'darkblue' )
+        ax.set_xlabel('# Features')
+        ax.set_ylabel('RSS')
+        ax.set_title('RSS - Best subset selection')
+        ax.plot(df.index2,df.min_RSS,color = 'r', label = 'Best subset')
+        ax.legend()
+
+        ax = fig.add_subplot(1, 2, 2)
+        ax.scatter(df.index2,df.R_squared, alpha = .2, color = 'darkblue' )
+        ax.plot(df.index2,df.max_R_squared,color = 'r', label = 'Best subset')
+        ax.set_xlabel('# Features')
+        ax.set_ylabel('R squared')
+        ax.set_title('R_squared - Best subset selection')
+        ax.legend()
+
+        plt.show()
+
+        #Initializing useful variables
+        m = len(Y)
+        #p = 11
+
+        #df1['index2'] = len(df1['features']
+        Features_length=[]
+        hat_sigma_squared=[]
+        for i in range(len(df1)):
+            P = len(df1['features'][i])
+            Features_length.append(P)
+            #what is the min function here doing????is that correct; statistically?
+            Sigma = (1/(m - P -1)) * min(df1['RSS'])
+            hat_sigma_squared.append(Sigma)
+
+        df1['number_of_features'] = Features_length
+        df1['index'] = df1['features'].index
+        df1['hat_sigma_squared'] = hat_sigma_squared
+
+        #need to change hat_sigmasqured bleow
+
+        #Will need to put these calculations into the loop above, since cant multiply two columns
+        #Computing
+        df1['C_p'] = (1/m) * (df1['RSS'] + 2 * df1['number_of_features'] * df1['hat_sigma_squared'] )
+        df1['AIC'] = (1/(m*df1['hat_sigma_squared'])) * (df1['RSS'] + 2 * df1['number_of_features'] * df1['hat_sigma_squared'] )
+        df1['BIC'] = (1/(m*df1['hat_sigma_squared'])) * (df1['RSS'] +  np.log(m) * df1['number_of_features'] * df1['hat_sigma_squared'] )
+        df1['R_squared_adj'] = 1 - ( (1 - df1['R_squared'])*(m-1)/(m-df1['number_of_features'] -1))
+
+        variables = ['C_p', 'AIC','BIC','R_squared_adj']
+        fig = plt.figure(figsize = (18,6))
+
+        for i,v in enumerate(variables):
+            #i-> plots 1,2,3,4,5
+            ax = fig.add_subplot(1, 4, i+1)
+
+            #Now that ax is created, pass df1('C_p'] with first one.
+            ax.plot(df1['index'],df1[v], color = 'lightblue')
+            ax.scatter(df1['index'],df1[v], color = 'darkblue')
+            if v == 'R_squared_adj':
+                ax.plot(df1[v].idxmax(),df1[v].max(), marker = 'x', markersize = 20)
+            else:
+                ax.plot(df1[v].idxmin(),df1[v].min(), marker = 'x', markersize = 20)
+            ax.set_xlabel('model_index')
+            ax.set_ylabel(v)
+
+        fig.suptitle('Subset selection using C_p, AIC, BIC, Adjusted R2', fontsize = 16)
+
+        print('Best models in M; below should show the X marked here')
+        plt.show()
+
+        #Since the charts don't overpenalize then we'll do the incorrect stats
+
+        df2 = pd.concat([pd.DataFrame({'features':feature_list}),pd.DataFrame({'RSS':RSS_list, 'R_squared': R_squared_list})], axis=1, join='inner')
+        #df1['numb_features'] = len(df1['features']
+        Features_length=[]
+        for i in range(len(df2)):
+            P = len(df2['features'][i])
+            Features_length.append(P)
+        df2['numb_features_1'] = Features_length
+        df2['numb_features'] = df2['features'].index
+
+        m = len(Y)
+        p = len(X.columns)
+        hat_sigma_squared = (1/(m - p -1)) * min(df1['RSS'])
+
+        #Computing
+        df2['C_p'] = (1/m) * (df2['RSS'] + 2 * df2['numb_features'] * hat_sigma_squared )
+        df2['AIC'] = (1/(m*hat_sigma_squared)) * (df2['RSS'] + 2 * df2['numb_features'] * hat_sigma_squared )
+        df2['BIC'] = (1/(m*hat_sigma_squared)) * (df2['RSS'] +  np.log(m) * df2['numb_features'] * hat_sigma_squared )
+        df2['R_squared_adj'] = 1 - ( (1 - df2['R_squared'])*(m-1)/(m-df2['numb_features'] -1))
+
+        #Plot out all indices 
+
+
+        variables = ['C_p', 'AIC','BIC','R_squared_adj']
+        fig = plt.figure(figsize = (18,6))
+
+        for i,v in enumerate(variables):
+            #i-> plots 1,2,3,4,5
+            ax = fig.add_subplot(1, 4, i+1)
+
+            #Now that ax is created, pass df1('C_p'] with first one.
+            ax.plot(df2['numb_features'],df2[v], color = 'lightblue')
+            ax.scatter(df2['numb_features'],df2[v], color = 'darkblue')
+            if v == 'R_squared_adj':
+                ax.plot(df2[v].idxmax(),df2[v].max(), marker = 'x', markersize = 20)
+            else:
+                ax.plot(df2[v].idxmin(),df2[v].min(), marker = 'x', markersize = 20)
+            ax.set_xlabel('Number of predictors')
+            ax.set_ylabel(v)
+
+        fig.suptitle('Subset selection using C_p, AIC, BIC, Adjusted R2', fontsize = 16)
+        print('This plot shows the models with the penalization term workin properly, but Not sure BIC,AIC etc is correct here')
+        plt.show()
+
+        #find best modls by the incorrect stats above
+        Porfin2=df2.sort_values(by=['C_p'],ascending=True)
+        #Cp isgoin to be bias for few variable models so if mnany vars then increase index below
+        Best__Models_byCP2=Porfin2[0:100]
+        Best__Models_byCP_then_adRsqrd2=Best__Models_byCP2.sort_values(by=['R_squared_adj'],ascending=False)
+        #df.groupby(['A']).max()
+
+        M2=Best__Models_byCP_then_adRsqrd2.drop_duplicates('numb_features_1', keep='first')
+
+
+
+
+        #Global minimum is where best occrr (the X), The penalization term takes over for larger predictors
+
+        #The reason there are many 'predictors' is because df1[v], aka df1['C_p'] for 1,1, is showing numbers for all models
+            #i.e. X axis is not number of predictors, rather the index for the best model
+
+            #to get real estimates, would need to select top performing models for each predictor. - use number of features in df1
+
+
+        #find best modls
+        Porfin=df1.sort_values(by=['C_p'],ascending=True)
+        #Cp isgoin to be bias for few variable models so if mnany vars then increase index below
+        Best__Models_byCP=Porfin[0:100]
+        Best__Models_byCP_then_adRsqrd=Best__Models_byCP.sort_values(by=['R_squared_adj'],ascending=False)
+        #df.groupby(['A']).max()
+
+        M=pd.DataFrame(Best__Models_byCP_then_adRsqrd.drop_duplicates('number_of_features', keep='first'))
+
+
+        #Criteria for choosing the optimal model:    Cp, AIC, BIC, R2adj
+        #Now display top 10 models with highest R-SQ & smalles cp,ai,bic, then check if its also larget adjusted rsquared; if not which is
+        #display scatter plot and suggest R-SQ is only for linear & where to begin non-liniearity
+
+        #graph out the errors y-y-hat and look at homogeniety of variance
+
+        from io import StringIO
+        from tabulate import tabulate
+
+        #best models within M
+        print('The best models without penaliaztion are:')
+        print(M)
+        print('The best models by penalization are:')
+        print(M2)
+        print('the default fit model')
+        model_1 = sm.OLS(Y, X)
+        result_1 = model_1.fit()
+        result_1.summary()
+
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+def random_forest_sicket_Learn(X,tar):
+    y=tar
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.model_selection import cross_val_score 
+    import numpy as np
+    from sklearn import metrics
+    estimator_range = range(10,700,10)
+    RMSE_scores=[]  
+    RSE_scores=[]
+    for estimator in estimator_range:
+        #estos son artos esimators, print el numero escojido abajo y si es muy alto, entonces considera esta overfitting 
+        #y chart it out manually
+        #reduce asumptions and make parmeters m
+        estimator_range = range(10,700,10)
+        clf = RandomForestRegressor(n_estimators=estimator, n_jobs=-1,random_state=1)
+        #If samples <10,000 (customar ynumber for actuarial), then CV = 2
+        N=len(X)
+        if N<10000:
+            CV=2 
+        else: CV=round(N/10000)
+        #should we always keep cv atleast 2, since below we do just one?    
+        MSE_scores = cross_val_score(clf,X,y,cv=CV,scoring='neg_mean_squared_error')
+        RMSE_scores.append(np.mean(np.sqrt(-MSE_scores)))
+        RSE_scores.append(np.mean(np.sqrt(-MSE_scores)))
+        RSE_scores.sort()
+        #Hay 700/10 elements in list below
+   
+    
+    #10 abajo porque stamos stepping by 10 
+    c=RMSE_scores.index(RSE_scores[0])
+    a=10*(1+c)    
+    
+    clf_i = RandomForestRegressor(n_estimators=a, n_jobs=-1,random_state=1)
+    #create prediction, cause at time you have fit you have coeffs
+    clf_i.fit(X,y)
+    y_pred = clf_i.predict(X)
+    #perhaps find better function to find the MSE; errors occur if cv=2
+    scores = cross_val_score(clf_i, X, y, cv=2, scoring='neg_mean_squared_error')
+    MSE = np.sqrt(metrics.mean_squared_error(y, y_pred))
+    mse_scores = -scores
+    rmse_scores = np.sqrt(mse_scores)
+    #Get coeficients; not every classifier gives them
+        #Google Search '.coef or .feature_importance' for that classifier
+        
+        
+    #df['coefmagnitude'] = df.Coef.map(lambda x: abs(x))
+    print ('[RandomForestRegressor]:')
+    print('Samplesize:',N)
+    print('# of estimators is analogouse to tree depth; large overfits:',a)
+    print ('# of CVs:',2,',','Mean RMSE:\n with:',rmse_scores.mean())
+
+
+
+    import matplotlib.pyplot as plt
+    plt.plot(estimator_range,RMSE_scores)
+    plt.xlabel('n_estimators')
+    plt.ylabel('RMSE(lower is better)')
+
+
+
+    #print ('Coefficients:\n\n',df.sort_values('coefmagnitude', ascending = False))
+    #print ('-'*70)
+   # print('\n')
+    
